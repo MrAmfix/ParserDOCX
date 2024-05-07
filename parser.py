@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+import sys
 import zipfile
 import xml.etree.ElementTree as ET
 from xml.etree.ElementTree import Element
@@ -46,7 +47,8 @@ class Parser:
                     paragraphs.append(para)
         return self._parse_paragraphs(paragraphs)
     
-    def parse_paragraphs_from_anchor(self, anchor_id: str):
+    def parse_paragraphs_from_anchor(self, anchor_id: str,
+                                     list_view: bool = True) -> Optional[str, List[str]]:
         tree = ET.parse(os.path.join(self._temp_dir, 'word', 'document.xml'))
         root = tree.getroot()
 
@@ -54,7 +56,7 @@ class Parser:
         text = []
         for p in root.iter(f"{{{schemas.w}}}p"):
             if p.findall(f'{{{schemas.w}}}bookmarkStart') and check:
-                return '\n'.join(text)
+                return text if list_view else '\n'.join(text)
             if check:
                 text.append(self._parse_text_from_anchor(p))
             if p.findall(f'{{{schemas.w}}}bookmarkStart[@{{{schemas.w}}}name="{anchor_id}"]'):
@@ -156,6 +158,8 @@ def iter_docs():
 def parsing_documents():
     root_in = join(str(join(dirname(abspath(__file__)))), 'documents_for_extract')
     root_out = join(str(join(dirname(abspath(__file__)))), 'out_json')
+    i = 1
+    c = len(os.listdir(root_in))
     for filename in os.listdir(root_in):
         try:
             p = Parser(join(root_in, filename))
@@ -163,9 +167,12 @@ def parsing_documents():
             n = {'potentially_damage': pot, 'table_of_content': struct_to_dict(s, p),
                     'other_text': p.get_other_text()}
             p.save(n, join(root_out, filename))
-            print(f"file - {filename} done!")
         except Exception as _e:
             logging.warn(_e)
+        finally:
+            sys.stdout.write(f"\rProgress: [{i} // {c}]")
+            sys.stdout.flush()
+            i += 1
 
 
 if __name__ == '__main__':
